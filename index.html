@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mes cours · Bachelier</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>tailwind.config={darkMode:'class'}</script>
+<style type="text/tailwindcss">
+@layer components{
+.card{@apply bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm p-5 transition-shadow hover:shadow-md}
+.btn{@apply inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-95 transition}
+.pri{@apply bg-indigo-600 text-white hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400}
+.inp{@apply w-full px-3 py-2 rounded-xl text-sm bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition}
+.nav{@apply flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 whitespace-nowrap transition}
+.nav.on{@apply bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300}
+}
+body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif}
+@keyframes up{from{opacity:0;transform:translateY(8px)}}
+.fade>*{animation:up .35s ease both}
+.flip{perspective:1200px}.flipin{transition:transform .6s cubic-bezier(.4,.2,.2,1);transform-style:preserve-3d}.flipin.f{transform:rotateY(180deg)}
+.face{backface-visibility:hidden;-webkit-backface-visibility:hidden;position:absolute;inset:0}.back{transform:rotateY(180deg)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body class="bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 min-h-screen antialiased">
+<div class="flex min-h-screen">
+  <aside class="hidden md:flex w-60 shrink-0 flex-col gap-1 p-4 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 sticky top-0 h-screen">
+    <div class="px-3 py-3 mb-3 text-lg font-semibold tracking-tight">🎓 Mes études</div>
+    <div id="nav" class="flex flex-col gap-1"></div>
+    <div class="mt-auto px-3 text-xs text-zinc-400">Sauvegarde automatique dans ce navigateur</div>
+  </aside>
+  <div class="flex-1 min-w-0">
+    <header class="sticky top-0 z-20 backdrop-blur bg-white/80 dark:bg-zinc-950/80 border-b border-zinc-200 dark:border-zinc-800 px-4 md:px-8 py-3 flex flex-wrap items-center gap-3">
+      <div id="tb" class="flex flex-wrap items-center gap-3"></div>
+      <div class="ml-auto flex gap-2">
+        <button class="btn" data-a="exp" title="Exporter en JSON">⬇️ <span class="hidden sm:inline">Exporter</span></button>
+        <button class="btn" data-a="imp" title="Importer un JSON">⬆️ <span class="hidden sm:inline">Importer</span></button>
+        <button class="btn" data-a="theme" id="th" title="Changer de thème">🌙</button>
+        <input type="file" id="imp" accept="application/json,.json" class="hidden">
+      </div>
+    </header>
+    <nav id="mnav" class="md:hidden flex overflow-x-auto gap-1 px-3 py-2 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"></nav>
+    <main id="main" class="p-4 md:p-8 max-w-6xl mx-auto"></main>
+  </div>
+</div>
+<div id="modal"></div>
+<div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-[60]"></div>
+
+<script>
+const $=s=>document.querySelector(s),uid=()=>Math.random().toString(36).slice(2,9),K='mes_cours_v1';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let mem=null;
+const load=()=>{try{return JSON.parse(localStorage.getItem(K))}catch(e){return mem}};
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){mem=JSON.parse(JSON.stringify(S))}};
+const day=(n,h)=>{const d=new Date(Date.now()+n*864e5);d.setHours(h,0,0,0);return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16)};
+
+function seed(){
+  const mk=(name,code,bloc,q,ects,color,t,[r,s,e],study,obt='',tgt='')=>({id:uid(),name,code,bloc,q,ects,color,study,obt,tgt,ch:t.map((x,i)=>({id:uid(),t:x,r:i<r,s:i<s,e:i<e}))});
+  const C=[
+    mk('Soins infirmiers en pneumologie','SIN210',2,'Q1',6,'#6366f1',['Anatomie respiratoire','Bilan respiratoire & ABCDE','BPCO & asthme','Oxygénothérapie','Drainage thoracique'],[5,4,2],5400,'',14),
+    mk('Pharmacologie clinique','PHA220',2,'Q1',5,'#ec4899',['Pharmacocinétique','Antibiotiques','Antalgiques & opioïdes','Calcul de doses'],[3,2,1],3600,'',12),
+    mk('Physiopathologie','PAT230',2,'Q1',5,'#10b981',['Système cardiovasculaire','Système respiratoire','Système endocrinien','Système rénal'],[2,1,0],1800,'',11),
+    mk('Santé mentale & psychiatrie','PSY240',2,'Q2',5,'#f59e0b',['Troubles de l\'humeur','Troubles anxieux','Schizophrénie','Relation d\'aide'],[1,0,0],0,'',13),
+    mk('Éthique & déontologie','ETH250',2,'Q2',3,'#0ea5e9',['Principes éthiques','Secret professionnel','Droits du patient'],[0,0,0],0,'',12),
+    mk('Méthodologie de recherche','REC260',2,'Q2',4,'#8b5cf6',['Question de recherche','Revue de littérature','Statistiques de base'],[0,0,0],0,'',10),
+    mk('Anatomie & physiologie','ANA110',1,'Q1',6,'#ef4444',['Appareil locomoteur','Système nerveux','Système digestif'],[3,3,3],7200,14),
+    mk('Hygiène & soins de base','HYG120',1,'Q2',6,'#14b8a6',['Hygiène hospitalière','Toilette du patient','Prévention des escarres'],[3,3,3],6000,15)
+  ];
+  const by=k=>C.find(c=>c.code==k).id,cards=(...p)=>p.map(([q,a])=>({id:uid(),q,a,k:0}));
+  return{theme:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light',bloc:2,q:'Q1',pomo:{w:25,b:5},courses:C,
+    exams:[['SIN210',12,9,'Écrit · Auditoire B'],['PHA220',15,14,'QCM + calculs de doses'],['PAT230',24,9,'Écrit'],['PSY240',75,9,'Oral'],['ETH250',80,13,'Écrit'],['REC260',88,9,'Remise de dossier']].map(([k,n,h,note])=>({id:uid(),cid:by(k),date:day(n,h),note})),
+    decks:[{id:uid(),cid:by('SIN210'),name:'Vocabulaire respiratoire',cards:cards(['Dyspnée','Sensation de gêne ou de difficulté à respirer'],['Cyanose','Coloration bleutée de la peau due à un manque d\'oxygène'],['SpO₂ normale chez l\'adulte sain ?','≥ 95 %'],['Tirage','Rétraction des tissus entre les côtes à l\'inspiration'])},
+      {id:uid(),cid:by('PHA220'),name:'Familles d\'antibiotiques',cards:cards(['Amoxicilline : famille ?','Bêta-lactamines (pénicillines)'],['Cible des bêta-lactamines','La paroi bactérienne'],['Effet indésirable classique des aminosides','Néphrotoxicité et ototoxicité'])}]};
+}
+let S=load()||seed();
+S.exams=S.exams||[];S.decks=S.decks||[];S.pomo=S.pomo||{w:25,b:5};
+let V={v:'dash',fd:null,rv:null},P={mode:'w',left:S.pomo.w*60,run:false,cid:'',last:0,n:0,iv:null},MK=null,tt;
+
+const PAL=['#6366f1','#ec4899','#10b981','#f59e0b','#0ea5e9','#8b5cf6','#ef4444','#14b8a6'];
+const cid=id=>S.courses.find(c=>c.id==id);
+const fl=()=>S.courses.filter(c=>c.bloc==S.bloc&&(S.q=='A'||c.q==S.q));
+const exs=()=>{const ids=new Set(fl().map(c=>c.id));return S.exams.filter(e=>ids.has(e.cid)).sort((a,b)=>a.date<b.date?-1:1)};
+const lbl=()=>`Bloc ${S.bloc} · ${S.q=='A'?'Vue annuelle':'Quadrimestre '+S.q.slice(1)}`;
+const cprog=c=>{const n=c.ch.length*3;return n?Math.round(c.ch.reduce((a,h)=>a+(+h.r)+(+h.s)+(+h.e),0)/n*100):0};
+const gprog=cs=>{let a=0,b=0;cs.forEach(c=>c.ch.forEach(h=>{a+=(+h.r)+(+h.s)+(+h.e);b+=3}));return b?Math.round(a/b*100):0};
+const fmtT=s=>{const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?`${h} h ${String(m).padStart(2,'0')}`:`${m} min`};
+const bar=(p,c)=>`<div class="h-2 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden"><div class="h-full rounded-full transition-all duration-500" style="width:${p}%;background:${c}"></div></div>`;
+const head=(t,s,b='')=>`<div class="flex flex-wrap items-end justify-between gap-3 mb-6"><div><h1 class="text-2xl font-semibold tracking-tight">${t}</h1><p class="text-sm text-zinc-500">${s}</p></div>${b}</div>`;
+const empty=m=>`<div class="card text-center text-zinc-500 py-12">${m}</div>`;
+const badge=(t,c)=>`<span class="px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-${c}-100 text-${c}-700 dark:bg-${c}-500/15 dark:text-${c}-300">${t}</span>`;
+const sel=(id,o,v,x='')=>`<select id="${id}" class="inp" ${x}>${o.map(([a,b])=>`<option value="${a}" ${a==v?'selected':''}>${esc(b)}</option>`).join('')}</select>`;
+const fld=(l,h)=>`<div><label class="block text-xs font-medium text-zinc-500 mb-1">${l}</label>${h}</div>`;
+const seg=(it,v,a)=>`<div class="inline-flex p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800">${it.map(([x,l])=>`<button data-a="${a}" data-v="${x}" class="px-3.5 py-1.5 rounded-lg text-sm font-medium transition ${x==v?'bg-white dark:bg-zinc-700 shadow text-indigo-600 dark:text-indigo-300':'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'}">${l}</button>`).join('')}</div>`;
+const toast=m=>{$('#toast').innerHTML=`<div class="px-4 py-2 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 text-sm shadow-lg">${esc(m)}</div>`;clearTimeout(tt);tt=setTimeout(()=>$('#toast').innerHTML='',2600)};
+function cd(e){const ms=new Date(e.date)-Date.now();if(ms<0)return{t:'Terminé',c:'zinc'};const d=Math.ceil(ms/864e5);return{t:ms<864e5?Math.floor(ms/36e5)+' h restantes':d+' jour'+(d>1?'s':''),c:d<=7?'red':d<=21?'amber':'emerald'}}
+
+/* ---------- Vues ---------- */
+function vDash(){
+  const cs=fl(),up=exs().filter(e=>new Date(e.date)>Date.now()),n=up[0],tot=cs.reduce((a,c)=>a+(c.study||0),0);
+  const st=(i,l,v,s)=>`<div class="card"><div class="text-2xl">${i}</div><div class="text-xs text-zinc-500 mt-2">${l}</div><div class="text-2xl font-semibold mt-0.5">${v}</div><div class="text-xs text-zinc-500 truncate">${s}</div></div>`;
+  return head('Bonjour 👋',lbl())+`<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">`
+   +st('📈','Progression',gprog(cs)+' %',cs.length+' cours')
+   +st('🎓','Crédits',cs.reduce((a,c)=>a+c.ects,0)+' ECTS',lbl())
+   +st('⏳','Prochain examen',n?cd(n).t:'—',n?esc(cid(n.cid).name):'Aucun examen prévu')
+   +st('🔥','Temps d\'étude',fmtT(tot),'cumulé sur la sélection')+`</div>
+  <div class="grid lg:grid-cols-5 gap-5 mt-5">
+   <div class="card lg:col-span-3"><h2 class="font-semibold mb-4">Avancement par cours</h2>${cs.length?cs.map(c=>`<div class="mb-4 last:mb-0"><div class="flex justify-between text-sm mb-1.5"><span class="truncate font-medium"><span class="inline-block w-2.5 h-2.5 rounded-full mr-2" style="background:${c.color}"></span>${esc(c.name)}</span><span class="text-zinc-500">${cprog(c)} %</span></div>${bar(cprog(c),c.color)}</div>`).join(''):`<p class="text-sm text-zinc-500">Aucun cours dans cette sélection. Ajoutez-en depuis l'onglet Cours.</p>`}</div>
+   <div class="card lg:col-span-2"><h2 class="font-semibold mb-4">Prochains examens</h2>${up.length?up.slice(0,4).map(e=>{const c=cid(e.cid),k=cd(e);return`<div class="flex items-center justify-between gap-2 py-2.5 border-b last:border-0 border-zinc-100 dark:border-zinc-800"><div class="min-w-0"><div class="text-sm font-medium truncate">${esc(c.name)}</div><div class="text-xs text-zinc-500">${new Date(e.date).toLocaleDateString('fr-BE',{day:'numeric',month:'long'})}</div></div>${badge(k.t,k.c)}</div>`}).join(''):`<p class="text-sm text-zinc-500">Aucun examen à venir.</p>`}</div></div>`;
+}
+function courseCard(c){
+  const p=cprog(c);
+  return `<div class="card" style="border-top:4px solid ${c.color}"><div class="flex items-start justify-between gap-2"><div class="min-w-0"><div class="font-semibold truncate">${esc(c.name)}</div><div class="text-xs text-zinc-500">${esc(c.code)} · ${c.q} · ${c.ects} ECTS · ⏱ ${fmtT(c.study||0)}</div></div><div class="flex gap-1"><button class="btn !px-2.5" data-a="editc" data-id="${c.id}" title="Modifier">✏️</button><button class="btn !px-2.5" data-a="delc" data-id="${c.id}" title="Supprimer">🗑️</button></div></div>
+  <div class="flex items-center gap-3 mt-4"><div class="flex-1">${bar(p,c.color)}</div><span class="text-sm font-semibold w-10 text-right">${p} %</span></div>
+  <div class="mt-4 flex text-[10px] font-medium text-zinc-400 px-1"><span class="flex-1">Chapitres</span><span class="w-14 text-center">Théorie</span><span class="w-14 text-center">Synthèse</span><span class="w-14 text-center">Exos</span><span class="w-6"></span></div>
+  ${c.ch.map(h=>`<div class="flex items-center text-sm px-1 py-1.5 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition"><span class="flex-1 truncate ${h.r&&h.s&&h.e?'line-through text-zinc-400':''}">${esc(h.t)}</span>${['r','s','e'].map(k=>`<span class="w-14 grid place-items-center"><input type="checkbox" class="w-4 h-4 cursor-pointer" style="accent-color:${c.color}" data-c="chk" data-id="${c.id}" data-h="${h.id}" data-k="${k}" ${h[k]?'checked':''}></span>`).join('')}<button class="w-6 text-zinc-400 hover:text-red-500" data-a="delch" data-id="${c.id}" data-h="${h.id}" title="Supprimer le chapitre">×</button></div>`).join('')}
+  <div class="flex gap-2 mt-3"><input id="nc-${c.id}" class="inp" placeholder="Ajouter un chapitre…"><button class="btn" data-a="addch" data-id="${c.id}">Ajouter</button></div></div>`;
+}
+function vCours(){const cs=fl();return head('Mes cours',lbl(),`<button class="btn pri" data-a="newc">＋ Nouveau cours</button>`)+(cs.length?`<div class="grid xl:grid-cols-2 gap-5">${cs.map(courseCard).join('')}</div>`:empty('Aucun cours pour cette sélection. Créez le premier avec « Nouveau cours ».'))}
+
+function vExam(){
+  const all=exs(),now=Date.now(),list=all.filter(e=>new Date(e.date)>=now).concat(all.filter(e=>new Date(e.date)<now));
+  return head('Examens',lbl(),`<button class="btn pri" data-a="newe">＋ Nouvel examen</button>`)+(list.length?`<div class="space-y-3">${list.map(e=>{
+    const c=cid(e.cid),d=new Date(e.date),k=cd(e);
+    return `<div class="card flex items-center gap-4 !p-4 ${k.c=='zinc'?'opacity-60':''}"><div class="w-14 text-center shrink-0 rounded-xl py-1.5" style="background:${c.color}1f"><div class="text-xl font-semibold leading-none" style="color:${c.color}">${d.getDate()}</div><div class="text-xs text-zinc-500">${d.toLocaleDateString('fr-BE',{month:'short'})}</div></div>
+    <div class="flex-1 min-w-0"><div class="font-medium truncate">${esc(c.name)}</div><div class="text-xs text-zinc-500 truncate">${d.toLocaleDateString('fr-BE',{weekday:'long'})} à ${d.toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}${e.note?' · '+esc(e.note):''}</div></div>
+    ${badge(k.t,k.c)}<button class="text-zinc-400 hover:text-red-500 px-1" data-a="dele" data-id="${e.id}" title="Supprimer">🗑️</button></div>`}).join('')}</div>
+    <p class="text-xs text-zinc-500 mt-4">🟢 plus de 3 semaines · 🟠 moins de 3 semaines · 🔴 moins d'une semaine</p>`:empty('Aucun examen planifié pour cette sélection.'));
+}
+
+function stHtml(){const cs=fl(),mx=Math.max(1,...cs.map(c=>c.study||0));return cs.length?cs.map(c=>`<div class="mb-3.5 last:mb-0"><div class="flex justify-between text-sm mb-1"><span class="truncate">${esc(c.name)}</span><span class="text-zinc-500 shrink-0 ml-2">${fmtT(c.study||0)}</span></div>${bar((c.study||0)/mx*100,c.color)}</div>`).join(''):`<p class="text-sm text-zinc-500">Aucun cours.</p>`}
+function vPomo(){
+  const cs=fl();if(!cs.find(c=>c.id==P.cid))P.cid=cs[0]?.id||'';
+  return head('Pomodoro',lbl())+`<div class="grid lg:grid-cols-5 gap-5"><div class="card lg:col-span-3 text-center">
+  <div id="pm" class="text-sm font-medium text-zinc-500"></div>
+  <div class="relative w-64 h-64 mx-auto my-4"><svg viewBox="0 0 100 100" class="-rotate-90 w-full h-full"><circle cx="50" cy="50" r="45" fill="none" stroke-width="4" class="stroke-zinc-200 dark:stroke-zinc-800"/><circle id="pr" cx="50" cy="50" r="45" fill="none" stroke-width="4" stroke-linecap="round" stroke-dasharray="282.7" style="transition:stroke-dashoffset 1s linear"/></svg><div id="pt" class="absolute inset-0 grid place-items-center text-5xl font-semibold tabular-nums"></div></div>
+  <div class="max-w-xs mx-auto">${fld('Cours révisé',cs.length?sel('pc',cs.map(c=>[c.id,c.name]),P.cid,'data-c="pcid"'):`<p class="text-sm text-zinc-500">Créez d'abord un cours.</p>`)}</div>
+  <div class="flex justify-center gap-2 mt-5"><button id="pb" class="btn pri !px-6" data-a="pstart"></button><button class="btn" data-a="preset">↺ Réinitialiser</button><button class="btn" data-a="pskip">⏭ Passer</button></div>
+  <div class="flex justify-center gap-4 mt-6 max-w-xs mx-auto">${fld('Travail (min)',`<input type="number" min="1" max="120" class="inp" value="${S.pomo.w}" data-c="pset" data-k="w">`)}${fld('Pause (min)',`<input type="number" min="1" max="60" class="inp" value="${S.pomo.b}" data-c="pset" data-k="b">`)}</div></div>
+  <div class="card lg:col-span-2"><h2 class="font-semibold mb-4">Temps d'étude par cours</h2><div id="pst"></div></div></div>`;
+}
+function upPomo(){
+  if(!$('#pt'))return;const tot=(P.mode=='w'?S.pomo.w:S.pomo.b)*60,m=Math.floor(P.left/60),s=P.left%60;
+  $('#pt').textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  $('#pr').style.strokeDashoffset=282.7*(1-P.left/tot);$('#pr').style.stroke=P.mode=='w'?(cid(P.cid)?.color||'#6366f1'):'#10b981';
+  $('#pm').textContent=P.mode=='w'?`🎯 Travail · session ${P.n+1}`:'☕ Pause';$('#pb').textContent=P.run?'⏸ Pause':'▶ Démarrer';$('#pst').innerHTML=stHtml();
+}
+function beep(){try{const a=new(window.AudioContext||window.webkitAudioContext)();[523,659,784].forEach((f,i)=>{const o=a.createOscillator(),g=a.createGain(),t=a.currentTime+i*.28;o.type='sine';o.frequency.value=f;o.connect(g);g.connect(a.destination);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.14,t+.06);g.gain.exponentialRampToValueAtTime(.001,t+.8);o.start(t);o.stop(t+.9)})}catch(e){}}
+function tick(){
+  const d=Math.round((Date.now()-P.last)/1000);if(d<1)return;P.last+=d*1000;
+  if(P.mode=='w'){const c=cid(P.cid);if(c)c.study=(c.study||0)+Math.min(d,P.left);}
+  P.left-=d;
+  if(P.left<=0){beep();if(P.mode=='w')P.n++;P.mode=P.mode=='w'?'b':'w';P.left=(P.mode=='w'?S.pomo.w:S.pomo.b)*60;toast(P.mode=='w'?'Pause terminée : on reprend 🎯':'Bien joué, place à la pause ☕')}
+  save();upPomo();document.title=`${String(Math.floor(P.left/60)).padStart(2,'0')}:${String(P.left%60).padStart(2,'0')} · Mes cours`;
+}
+
+const avg=(cs,f)=>{let w=0,s=0;cs.forEach(c=>{const v=f(c);if(v!=null){s+=v*c.ects;w+=c.ects}});return w?s/w:null};
+const mention=v=>v==null?['—','zinc']:v<10?['Échec','red']:v<12?['Réussite','emerald']:v<14?['Satisfaction','emerald']:v<16?['Distinction','sky']:v<18?['Grande distinction','violet']:['Plus grande distinction','violet'];
+const rowB=c=>{const sim=c.obt==='',v=sim?(c.tgt===''?null:+c.tgt):+c.obt;if(v==null)return'';const[m,k]=mention(v);return badge((sim?'Simulé · ':'')+m,k)};
+function sumHtml(){
+  const cs=fl(),r=avg(cs,c=>c.obt===''?null:+c.obt),s=avg(cs,c=>c.obt!==''?+c.obt:(c.tgt!==''?+c.tgt:null));
+  const ok=cs.filter(c=>c.obt!==''&&+c.obt>=10).reduce((a,c)=>a+c.ects,0),tot=cs.reduce((a,c)=>a+c.ects,0);
+  const box=(t,v,sub)=>{const[m,c]=mention(v);return `<div class="card"><div class="text-xs text-zinc-500">${t}</div><div class="flex items-baseline gap-2 mt-1"><span class="text-4xl font-semibold tabular-nums text-${c}-600 dark:text-${c}-400">${v==null?'—':v.toFixed(2)}</span><span class="text-zinc-400">/ 20</span></div>
+  <div class="relative mt-3 h-2.5 rounded-full bg-zinc-200 dark:bg-zinc-800"><div class="h-full rounded-full bg-${c}-500 transition-all duration-500" style="width:${(v||0)*5}%"></div><div class="absolute -top-1 -bottom-1 w-0.5 bg-zinc-500/70" style="left:50%" title="Seuil de réussite : 10/20"></div></div>
+  <div class="mt-3 text-sm font-medium">${v==null?'Saisissez des notes':(v>=10?'✅ ':'⚠️ ')+m}</div><div class="text-xs text-zinc-500">${sub}</div></div>`};
+  return box('Moyenne réelle (notes obtenues)',r,`${ok} / ${tot} ECTS validés (≥ 10/20)`)+box('Moyenne simulée (obtenues + cibles)',s,'Le trait central marque le seuil de 10/20');
+}
+function vNotes(){
+  const cs=fl();
+  return head('Notes & simulateur de moyenne',lbl())+(cs.length?`<div id="gsum" class="grid sm:grid-cols-2 gap-4 mb-5">${sumHtml()}</div>
+  <div class="card !p-0 overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs text-zinc-500 border-b border-zinc-200 dark:border-zinc-800"><th class="p-4 font-medium">Cours</th><th class="p-4 font-medium">ECTS</th><th class="p-4 font-medium">Note obtenue /20</th><th class="p-4 font-medium">Note cible /20</th><th class="p-4 font-medium">Résultat</th></tr></thead><tbody>
+  ${cs.map(c=>`<tr class="border-b last:border-0 border-zinc-100 dark:border-zinc-800"><td class="p-4"><span class="inline-block w-2.5 h-2.5 rounded-full mr-2" style="background:${c.color}"></span>${esc(c.name)}<div class="text-xs text-zinc-500 ml-[18px]">${esc(c.code)} · ${c.q}</div></td><td class="p-4">${c.ects}</td>
+  <td class="p-4"><input type="number" min="0" max="20" step="0.5" class="inp !w-24" data-i="obt" data-id="${c.id}" value="${c.obt}"></td><td class="p-4"><input type="number" min="0" max="20" step="0.5" class="inp !w-24" data-i="tgt" data-id="${c.id}" value="${c.tgt}"></td><td class="p-4" id="gb-${c.id}">${rowB(c)}</td></tr>`).join('')}</tbody></table></div>
+  <p class="text-xs text-zinc-500 mt-3">Moyenne pondérée par les crédits ECTS. Mentions : 12 satisfaction · 14 distinction · 16 grande distinction · 18 plus grande distinction.</p>`:empty('Aucun cours dans cette sélection.'));
+}
+
+function vFlash(){
+  const ids=new Set(fl().map(c=>c.id)),d=V.fd&&S.decks.find(x=>x.id==V.fd);
+  if(d&&V.rv)return vRev(d);
+  if(d)return `<button class="btn mb-4" data-a="closed">← Paquets</button>`+head(esc(d.name),`${esc(cid(d.cid)?.name||'')} · ${d.cards.length} carte${d.cards.length>1?'s':''}`,`<button class="btn pri" data-a="rev" data-id="${d.id}">▶ Réviser</button>`)
+   +`<div class="card mb-5"><h2 class="font-semibold mb-3">Nouvelle carte</h2><div class="grid sm:grid-cols-2 gap-3"><textarea id="cq" rows="2" class="inp" placeholder="Question"></textarea><textarea id="ca" rows="2" class="inp" placeholder="Réponse"></textarea></div><button class="btn pri mt-3" data-a="addcard">Ajouter la carte</button></div>
+   <div class="space-y-2">${d.cards.map(c=>`<div class="card !p-4 flex items-center gap-3"><div class="flex-1 min-w-0"><div class="text-sm font-medium">${esc(c.q)}</div><div class="text-sm text-zinc-500">${esc(c.a)}</div></div>${c.k?badge('Maîtrisée','emerald'):''}<button class="text-zinc-400 hover:text-red-500" data-a="delcard" data-id="${c.id}">🗑️</button></div>`).join('')||empty('Ce paquet est vide. Ajoutez votre première carte ci-dessus.')}</div>`;
+  const ds=S.decks.filter(x=>ids.has(x.cid));
+  return head('Flashcards',lbl(),`<button class="btn pri" data-a="newd">＋ Nouveau paquet</button>`)+(ds.length?`<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">${ds.map(x=>{const c=cid(x.cid),m=x.cards.length?Math.round(x.cards.filter(y=>y.k).length/x.cards.length*100):0;
+   return `<div class="card" style="border-top:4px solid ${c.color}"><div class="font-semibold truncate">${esc(x.name)}</div><div class="text-xs text-zinc-500 truncate">${esc(c.name)}</div><div class="flex items-center gap-3 mt-4"><div class="flex-1">${bar(m,c.color)}</div><span class="text-xs text-zinc-500">${x.cards.length} cartes · ${m} %</span></div>
+   <div class="flex gap-2 mt-4"><button class="btn pri flex-1" data-a="rev" data-id="${x.id}">Réviser</button><button class="btn" data-a="opend" data-id="${x.id}">Gérer</button><button class="btn !px-2.5" data-a="deld" data-id="${x.id}">🗑️</button></div></div>`}).join('')}</div>`:empty('Aucun paquet pour cette sélection. Créez-en un pour réviser activement.'));
+}
+function vRev(d){
+  const R=V.rv;
+  if(!d.cards.length)return `<button class="btn mb-4" data-a="closed">← Paquets</button>`+empty('Ce paquet est vide.');
+  if(R.i>=R.q.length)return `<div class="card max-w-md mx-auto text-center py-10"><div class="text-4xl">🎉</div><h2 class="text-xl font-semibold mt-3">Session terminée</h2><p class="text-zinc-500 mt-1">✅ ${R.ok} maîtrisée${R.ok>1?'s':''} · 😕 ${R.miss.length} à revoir</p><div class="flex justify-center gap-2 mt-6">${R.miss.length?`<button class="btn pri" data-a="retry">Revoir les cartes ratées</button>`:''}<button class="btn" data-a="closed">Terminer</button></div></div>`;
+  const c=d.cards.find(x=>x.id==R.q[R.i]);
+  return `<button class="btn mb-4" data-a="closed">← Quitter</button><div class="max-w-xl mx-auto"><div class="flex justify-between text-sm text-zinc-500 mb-2"><span>${esc(d.name)}</span><span>Carte ${R.i+1} / ${R.q.length}</span></div>${bar(R.i/R.q.length*100,'#6366f1')}
+  <div class="flip mt-5"><div id="fc" data-a="flip" class="flipin relative h-72 cursor-pointer"><div class="face card grid place-items-center text-center text-xl font-medium !p-8">${esc(c.q)}</div><div class="face back card grid place-items-center text-center text-lg !bg-indigo-50 dark:!bg-indigo-950/50 !p-8">${esc(c.a)}</div></div></div>
+  <p class="text-center text-xs text-zinc-500 mt-3">Cliquez sur la carte (ou Espace) pour la retourner</p>
+  <div class="grid grid-cols-2 gap-3 mt-5"><button class="btn !py-3" data-a="ans" data-v="0">😕 À revoir</button><button class="btn pri !py-3" data-a="ans" data-v="1">✅ Je savais</button></div></div>`;
+}
+
+/* ---------- Rendu ---------- */
+const NAV=[['dash','🏠','Tableau de bord'],['cours','📚','Cours'],['exam','🗓️','Examens'],['pomo','⏱️','Pomodoro'],['notes','🎯','Notes & moyenne'],['flash','🃏','Flashcards']];
+function render(anim){
+  document.documentElement.classList.toggle('dark',S.theme=='dark');
+  $('#tb').innerHTML=seg([[1,'Bloc 1'],[2,'Bloc 2'],[3,'Bloc 3']],S.bloc,'bloc')+seg([['Q1','Q1'],['Q2','Q2'],['A','Vue annuelle']],S.q,'q');
+  const nv=NAV.map(([k,i,l])=>`<button data-a="view" data-v="${k}" class="nav ${V.v==k?'on':''}"><span>${i}</span>${l}</button>`).join('');
+  $('#nav').innerHTML=nv;$('#mnav').innerHTML=nv;
+  const m=$('#main');m.innerHTML=({dash:vDash,cours:vCours,exam:vExam,pomo:vPomo,notes:vNotes,flash:vFlash})[V.v]();
+  if(anim){m.classList.remove('fade');void m.offsetWidth;m.classList.add('fade')}
+  $('#th').textContent=S.theme=='dark'?'☀️':'🌙';upPomo();
+}
+
+/* ---------- Modales ---------- */
+const close=()=>{$('#modal').innerHTML='';MK=null};
+function modal(t,body,ok,label='Enregistrer'){
+  MK=ok;$('#modal').innerHTML=`<div class="bk fixed inset-0 z-50 grid place-items-center p-4 bg-black/40 backdrop-blur-sm"><div class="card w-full max-w-md max-h-[90vh] overflow-auto !p-6 hover:!shadow-sm"><h3 class="text-lg font-semibold mb-4">${t}</h3><div class="space-y-3">${body}</div><div class="flex justify-end gap-2 mt-6"><button class="btn" data-a="mclose">Annuler</button><button class="btn pri" data-a="mok">${label}</button></div></div></div>`;
+  setTimeout(()=>$('#modal input,#modal select')?.focus(),30);
+}
+const opts=()=>S.courses.slice().sort((a,b)=>a.bloc-b.bloc||a.name.localeCompare(b.name)).map(c=>[c.id,`B${c.bloc} · ${c.name}`]);
+function courseForm(id){
+  const c=id?cid(id):{name:'',code:'',bloc:S.bloc,q:S.q=='Q2'?'Q2':'Q1',ects:5,color:PAL[S.courses.length%PAL.length]};
+  modal(id?'Modifier le cours':'Nouveau cours',
+   fld('Nom du cours',`<input id="f-n" class="inp" value="${esc(c.name)}">`)
+   +`<div class="grid grid-cols-2 gap-3">${fld('Code',`<input id="f-c" class="inp" value="${esc(c.code)}">`)}${fld('Crédits ECTS',`<input id="f-e" type="number" min="0" max="60" class="inp" value="${c.ects}">`)}</div>`
+   +`<div class="grid grid-cols-3 gap-3">${fld('Bloc',sel('f-b',[1,2,3].map(b=>[b,'Bloc '+b]),c.bloc))}${fld('Quadrimestre',sel('f-q',[['Q1','Q1'],['Q2','Q2']],c.q))}${fld('Couleur',`<input id="f-k" type="color" class="h-[38px] w-full rounded-xl cursor-pointer bg-transparent" value="${c.color}">`)}</div>`,
+   ()=>{const n=$('#f-n').value.trim();if(!n)return toast('Le nom du cours est requis');
+    const o={name:n,code:$('#f-c').value.trim(),ects:+$('#f-e').value||0,bloc:+$('#f-b').value,q:$('#f-q').value,color:$('#f-k').value};
+    if(id)Object.assign(c,o);else S.courses.push({id:uid(),ch:[],study:0,obt:'',tgt:'',...o});
+    close();save();render();toast(id?'Cours modifié':'Cours ajouté')});
+}
+
+/* ---------- Actions ---------- */
+const A={
+  view:d=>{V.v=d.v;render(1)},
+  bloc:d=>{S.bloc=+d.v;save();render(1)},
+  q:d=>{S.q=d.v;save();render(1)},
+  theme:()=>{S.theme=S.theme=='dark'?'light':'dark';save();render()},
+  exp:()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));a.download='sauvegarde-cours-'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('Sauvegarde exportée ✔')},
+  imp:()=>$('#imp').click(),
+  mclose:close,mok:()=>MK&&MK(),
+  newc:()=>courseForm(),editc:d=>courseForm(d.id),
+  delc:d=>{const c=cid(d.id);if(!confirm(`Supprimer « ${c.name} » avec ses examens et flashcards ?`))return;S.courses=S.courses.filter(x=>x.id!=c.id);S.exams=S.exams.filter(x=>x.cid!=c.id);S.decks=S.decks.filter(x=>x.cid!=c.id);save();render()},
+  addch:d=>{const i=$('#nc-'+d.id),t=i.value.trim();if(!t)return;cid(d.id).ch.push({id:uid(),t,r:0,s:0,e:0});save();render();$('#nc-'+d.id)?.focus()},
+  delch:d=>{const c=cid(d.id);c.ch=c.ch.filter(h=>h.id!=d.h);save();render()},
+  newe:()=>{if(!S.courses.length)return toast('Créez d\'abord un cours');
+    modal('Nouvel examen',fld('Cours',sel('x-c',opts(),fl()[0]?.id))+fld('Date et heure',`<input id="x-d" type="datetime-local" class="inp" value="${day(14,9)}">`)+fld('Note (lieu, type…)',`<input id="x-n" class="inp" placeholder="Écrit · Auditoire B">`),
+    ()=>{const d=$('#x-d').value;if(!d)return toast('La date est requise');S.exams.push({id:uid(),cid:$('#x-c').value,date:d,note:$('#x-n').value.trim()});close();save();render();toast('Examen ajouté')})},
+  dele:d=>{S.exams=S.exams.filter(e=>e.id!=d.id);save();render()},
+  pstart:()=>{if(P.mode=='w'&&!P.cid)return toast('Choisissez d\'abord un cours');
+    if(P.run){clearInterval(P.iv);document.title='Mes cours'}else{P.last=Date.now();P.iv=setInterval(tick,1000)}P.run=!P.run;upPomo()},
+  preset:()=>{clearInterval(P.iv);P.run=false;P.mode='w';P.left=S.pomo.w*60;document.title='Mes cours';upPomo()},
+  pskip:()=>{P.mode=P.mode=='w'?'b':'w';P.left=(P.mode=='w'?S.pomo.w:S.pomo.b)*60;P.last=Date.now();upPomo()},
+  newd:()=>{if(!S.courses.length)return toast('Créez d\'abord un cours');
+    modal('Nouveau paquet',fld('Nom du paquet',`<input id="d-n" class="inp" placeholder="Ex. Vocabulaire médical">`)+fld('Cours associé',sel('d-c',opts(),fl()[0]?.id)),
+    ()=>{const n=$('#d-n').value.trim();if(!n)return toast('Le nom est requis');const d={id:uid(),cid:$('#d-c').value,name:n,cards:[]};S.decks.push(d);V.fd=d.id;V.rv=null;close();save();render()},'Créer')},
+  deld:d=>{if(!confirm('Supprimer ce paquet ?'))return;S.decks=S.decks.filter(x=>x.id!=d.id);save();render()},
+  opend:d=>{V.fd=d.id;V.rv=null;render(1)},
+  closed:()=>{V.fd=null;V.rv=null;render(1)},
+  addcard:()=>{const q=$('#cq').value.trim(),a=$('#ca').value.trim();if(!q||!a)return toast('Remplissez la question et la réponse');S.decks.find(x=>x.id==V.fd).cards.push({id:uid(),q,a,k:0});save();render();$('#cq').focus()},
+  delcard:d=>{const k=S.decks.find(x=>x.id==V.fd);k.cards=k.cards.filter(c=>c.id!=d.id);save();render()},
+  rev:d=>{const k=S.decks.find(x=>x.id==d.id);V.fd=k.id;const q=k.cards.map(c=>c.id).sort(()=>Math.random()-.5).sort((a,b)=>k.cards.find(c=>c.id==a).k-k.cards.find(c=>c.id==b).k);V.rv={q,i:0,ok:0,miss:[]};render(1)},
+  retry:()=>{V.rv={q:V.rv.miss.slice(),i:0,ok:0,miss:[]};render()},
+  flip:()=>$('#fc')?.classList.toggle('f'),
+  ans:d=>{const R=V.rv,k=S.decks.find(x=>x.id==V.fd),c=k.cards.find(x=>x.id==R.q[R.i]);c.k=+d.v;if(+d.v)R.ok++;else R.miss.push(c.id);R.i++;save();render()}
+};
+const C={
+  chk:(d,t)=>{cid(d.id).ch.find(h=>h.id==d.h)[d.k]=t.checked;save();render()},
+  pcid:(d,t)=>{P.cid=t.value},
+  pset:(d,t)=>{S.pomo[d.k]=Math.max(1,+t.value||1);save();if(!P.run){P.mode='w';P.left=S.pomo.w*60}upPomo()}
+};
+function doImport(f){
+  if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.courses))throw 0;if(!confirm('Remplacer toutes les données actuelles par cette sauvegarde ?'))return;
+    S=d;S.exams=S.exams||[];S.decks=S.decks||[];S.pomo=S.pomo||{w:25,b:5};V.fd=V.rv=null;save();render(1);toast('Données importées ✔')}catch(e){toast('Fichier invalide : sauvegarde JSON attendue')}$('#imp').value=''};
+  r.readAsText(f);
+}
+document.addEventListener('click',e=>{
+  if(e.target.classList.contains('bk'))return close();
+  const t=e.target.closest('[data-a]');if(t&&A[t.dataset.a])A[t.dataset.a](t.dataset,t);
+});
+document.addEventListener('change',e=>{const t=e.target;if(t.id=='imp')return doImport(t.files[0]);if(t.dataset.c&&C[t.dataset.c])C[t.dataset.c](t.dataset,t)});
+document.addEventListener('input',e=>{
+  const t=e.target;if(!t.dataset.i)return;const c=cid(t.dataset.id);
+  c[t.dataset.i]=t.value===''?'':Math.min(20,Math.max(0,+t.value));save();$('#gsum').innerHTML=sumHtml();$('#gb-'+c.id).innerHTML=rowB(c);
+});
+document.addEventListener('keydown',e=>{
+  if(e.key=='Enter'&&e.target.id?.startsWith('nc-'))return A.addch({id:e.target.id.slice(3)});
+  if(e.key=='Escape')close();
+  if(e.code=='Space'&&V.v=='flash'&&V.rv&&!/INPUT|TEXTAREA|SELECT|BUTTON/.test(e.target.tagName)){e.preventDefault();A.flip()}
+});
+render(1);
+</script>
+</body>
+</html>
