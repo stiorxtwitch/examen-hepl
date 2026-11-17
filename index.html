@@ -6,6 +6,7 @@
 <title>Mes cours · Bachelier</title>
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <script>tailwind.config={darkMode:'class'}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style type="text/tailwindcss">
 @layer components{
 .card{@apply bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm p-5 transition-shadow hover:shadow-md}
@@ -21,6 +22,10 @@ body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-ser
 .flip{perspective:1200px}.flipin{transition:transform .6s cubic-bezier(.4,.2,.2,1);transform-style:preserve-3d}.flipin.f{transform:rotateY(180deg)}
 .face{backface-visibility:hidden;-webkit-backface-visibility:hidden;position:absolute;inset:0}.back{transform:rotateY(180deg)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.rd{height:calc(100vh - 11rem);min-height:480px}
+body.focus aside,body.focus header,body.focus #mnav{display:none}
+body.focus .rd{height:calc(100vh - 1.5rem)}
+body.focus #main{max-width:none;padding:.75rem}
 </style>
 </head>
 <body class="bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 min-h-screen antialiased">
@@ -140,7 +145,9 @@ function vPomo(){
   <div class="card lg:col-span-2"><h2 class="font-semibold mb-4">Temps d'étude par cours</h2><div id="pst"></div></div></div>`;
 }
 function upPomo(){
-  if(!$('#pt'))return;const tot=(P.mode=='w'?S.pomo.w:S.pomo.b)*60,m=Math.floor(P.left/60),s=P.left%60;
+  const tot=(P.mode=='w'?S.pomo.w:S.pomo.b)*60,m=Math.floor(P.left/60),s=P.left%60;
+  if($('#wt')){$('#wt').textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;$('#wb').textContent=P.run?'⏸':'▶';$('#wm').textContent=P.mode=='w'?'🎯':'☕';$('#ws').textContent='⏱ '+fmtT(cid(P.cid)?.study||0)}
+  if(!$('#pt'))return;
   $('#pt').textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
   $('#pr').style.strokeDashoffset=282.7*(1-P.left/tot);$('#pr').style.stroke=P.mode=='w'?(cid(P.cid)?.color||'#6366f1'):'#10b981';
   $('#pm').textContent=P.mode=='w'?`🎯 Travail · session ${P.n+1}`:'☕ Pause';$('#pb').textContent=P.run?'⏸ Pause':'▶ Démarrer';$('#pst').innerHTML=stHtml();
@@ -197,15 +204,16 @@ function vRev(d){
 }
 
 /* ---------- Rendu ---------- */
-const NAV=[['dash','🏠','Tableau de bord'],['cours','📚','Cours'],['exam','🗓️','Examens'],['pomo','⏱️','Pomodoro'],['notes','🎯','Notes & moyenne'],['flash','🃏','Flashcards']];
+const NAV=[['dash','🏠','Tableau de bord'],['cours','📚','Cours'],['exam','🗓️','Examens'],['pomo','⏱️','Pomodoro'],['notes','🎯','Notes & moyenne'],['flash','🃏','Flashcards'],['pdf','📄','Synthèses & PDF']];
 function render(anim){
   document.documentElement.classList.toggle('dark',S.theme=='dark');
   $('#tb').innerHTML=seg([[1,'Bloc 1'],[2,'Bloc 2'],[3,'Bloc 3']],S.bloc,'bloc')+seg([['Q1','Q1'],['Q2','Q2'],['A','Vue annuelle']],S.q,'q');
   const nv=NAV.map(([k,i,l])=>`<button data-a="view" data-v="${k}" class="nav ${V.v==k?'on':''}"><span>${i}</span>${l}</button>`).join('');
   $('#nav').innerHTML=nv;$('#mnav').innerHTML=nv;
-  const m=$('#main');m.innerHTML=({dash:vDash,cours:vCours,exam:vExam,pomo:vPomo,notes:vNotes,flash:vFlash})[V.v]();
+  const m=$('#main');m.innerHTML=({dash:vDash,cours:vCours,exam:vExam,pomo:vPomo,notes:vNotes,flash:vFlash,pdf:vPdf})[V.v]();
   if(anim){m.classList.remove('fade');void m.offsetWidth;m.classList.add('fade')}
   $('#th').textContent=S.theme=='dark'?'☀️':'🌙';upPomo();
+  if(V.v=='pdf'&&V.pf&&Rd&&Rd.doc){rTool();rPage()}
 }
 
 /* ---------- Modales ---------- */
@@ -237,7 +245,7 @@ const A={
   imp:()=>$('#imp').click(),
   mclose:close,mok:()=>MK&&MK(),
   newc:()=>courseForm(),editc:d=>courseForm(d.id),
-  delc:d=>{const c=cid(d.id);if(!confirm(`Supprimer « ${c.name} » avec ses examens et flashcards ?`))return;S.courses=S.courses.filter(x=>x.id!=c.id);S.exams=S.exams.filter(x=>x.cid!=c.id);S.decks=S.decks.filter(x=>x.cid!=c.id);save();render()},
+  delc:d=>{const c=cid(d.id);if(!confirm(`Supprimer « ${c.name} » avec ses examens et flashcards ?`))return;S.courses=S.courses.filter(x=>x.id!=c.id);S.exams=S.exams.filter(x=>x.cid!=c.id);S.decks=S.decks.filter(x=>x.cid!=c.id);PF.filter(f=>f.cid==c.id).forEach(delPf);save();render()},
   addch:d=>{const i=$('#nc-'+d.id),t=i.value.trim();if(!t)return;cid(d.id).ch.push({id:uid(),t,r:0,s:0,e:0});save();render();$('#nc-'+d.id)?.focus()},
   delch:d=>{const c=cid(d.id);c.ch=c.ch.filter(h=>h.id!=d.h);save();render()},
   newe:()=>{if(!S.courses.length)return toast('Créez d\'abord un cours');
@@ -286,6 +294,90 @@ document.addEventListener('keydown',e=>{
   if(e.key=='Escape')close();
   if(e.code=='Space'&&V.v=='flash'&&V.rv&&!/INPUT|TEXTAREA|SELECT|BUTTON/.test(e.target.tagName)){e.preventDefault();A.flip()}
 });
+/* ---------- Synthèses & PDF (IndexedDB + PDF.js) ---------- */
+let PF=[],Rd=null,pdfReady=null;
+const COLS=['#facc15','#4ade80','#f472b6','#38bdf8'];
+const dbp=new Promise((res,rej)=>{const r=indexedDB.open('mes_cours_pdf',1);r.onupgradeneeded=()=>{r.result.createObjectStore('files',{keyPath:'id'});r.result.createObjectStore('ann')};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+const tx=async(st,mode,fn)=>{const d=await dbp;return new Promise((res,rej)=>{const t=d.transaction(st,mode),q=fn(t.objectStore(st));t.oncomplete=()=>res(q&&q.result);t.onerror=t.onabort=()=>rej(t.error)})};
+dbp.then(()=>tx('files','readonly',s=>s.getAll())).then(x=>{PF=x||[];if(V.v=='pdf')render()}).catch(()=>{});
+const delPf=async f=>{PF=PF.filter(x=>x.id!=f.id);await tx('files','readwrite',s=>s.delete(f.id));await tx('ann','readwrite',s=>s.delete(IDBKeyRange.bound(f.id+':',f.id+':\uffff')))};
+function ensurePdf(){return pdfReady||(pdfReady=(async()=>{const L=window.pdfjsLib;if(!L)throw new Error('pdfjs');const u='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  try{L.GlobalWorkerOptions.workerSrc=URL.createObjectURL(new Blob([await(await fetch(u)).text()],{type:'text/javascript'}))}catch(e){L.GlobalWorkerOptions.workerSrc=u}return L})())}
+
+function vPdf(){
+  if(V.pf&&Rd)return `<div class="rd flex flex-col gap-3"><div id="rtb" class="card !p-3 flex flex-wrap items-center gap-2 hover:!shadow-sm">${tbHtml()}</div>
+   <div id="pgw" class="flex-1 overflow-auto rounded-2xl bg-zinc-200/70 dark:bg-zinc-900 p-4">${Rd.doc?`<div class="relative mx-auto w-fit shadow-xl bg-white"><canvas id="pdfc" class="block"></canvas><canvas id="anc" class="absolute inset-0" style="mix-blend-mode:multiply"></canvas></div>`:`<div class="text-center text-zinc-500 py-16">Chargement du PDF…</div>`}</div></div>`;
+  const cs=fl().filter(c=>PF.some(f=>f.cid==c.id));
+  return head('Synthèses & PDF',lbl(),`<button class="btn pri" data-a="pimp">＋ Importer des PDF</button>`)
+   +(cs.length?cs.map(c=>`<div class="mb-6"><h2 class="font-semibold mb-3"><span class="inline-block w-2.5 h-2.5 rounded-full mr-2" style="background:${c.color}"></span>${esc(c.name)} <span class="text-xs font-normal text-zinc-500">· ${esc(c.code)} · ${fmtT(c.study||0)} d'étude</span></h2><div class="space-y-2">
+   ${PF.filter(f=>f.cid==c.id).map(f=>`<div class="card !p-4 flex items-center gap-3"><div class="text-2xl">📄</div><div class="flex-1 min-w-0"><div class="font-medium truncate">${esc(f.name)}</div><div class="text-xs text-zinc-500">${(f.size/1048576).toFixed(1)} Mo · ajouté le ${new Date(f.added).toLocaleDateString('fr-BE')}</div></div><button class="btn pri" data-a="openpf" data-id="${f.id}">Ouvrir</button><button class="btn !px-2.5" data-a="delpf" data-id="${f.id}" title="Supprimer">🗑️</button></div>`).join('')}</div></div>`).join(''):empty('Aucune synthèse pour cette sélection. Importez vos PDF et associez-les à un cours.'))
+   +`<p class="text-xs text-zinc-500">Les PDF et surlignements restent dans ce navigateur (IndexedDB) et ne sont pas inclus dans l'export JSON.</p>`;
+}
+function tbHtml(){
+  const R=Rd,c=cid(R.rec.cid),b=(a,l,x='',on=0,t='')=>`<button class="btn !px-2.5 ${on?'!bg-indigo-600 !text-white':''}" data-a="${a}" ${x} title="${t}">${l}</button>`;
+  return `<button class="btn" data-a="closepf">← Synthèses</button><div class="min-w-0 max-w-[14rem] truncate text-sm font-medium"><span class="inline-block w-2.5 h-2.5 rounded-full mr-1.5" style="background:${c?.color||'#888'}"></span>${esc(R.rec.name)}</div>
+  <div class="flex items-center gap-1">${b('rprev','◀','','','Page précédente')}<input id="rpg" type="number" min="1" max="${R.total||1}" value="${R.n}" class="inp !w-16 text-center" data-c="rpg"><span class="text-sm text-zinc-500">/ ${R.total||'…'}</span>${b('rnext','▶','','','Page suivante')}</div>
+  <div class="flex items-center gap-1">${b('rzout','−','','','Zoom −')}<span class="text-xs text-zinc-500 w-10 text-center">${Math.round(R.scale*100)} %</span>${b('rzin','＋','','','Zoom +')}${b('rfit','↔ Largeur','',R.fit)}</div>
+  <div class="flex items-center gap-1.5 flex-wrap">${b('rtool','🖍️ Fluo','data-v="pen"',R.tool=='pen')}${COLS.map(k=>`<button data-a="rcol" data-v="${k}" class="w-6 h-6 rounded-full transition active:scale-90 ${R.color==k?'ring-2 ring-offset-2 ring-indigo-500 dark:ring-offset-zinc-900':''}" style="background:${k}" title="Couleur du surligneur"></button>`).join('')}<input type="range" min="6" max="40" value="${R.w}" data-c="rw" class="w-20 accent-indigo-500" title="Épaisseur du trait">${b('rtool','🧽 Gomme','data-v="erase"',R.tool=='erase')}${b('rclr','🗑️ Page','','','Effacer les traits de la page')}</div>
+  ${b('rfocus','⛶ Lecture','',document.body.classList.contains('focus'),'Mode lecture plein écran')}
+  <div class="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-sm"><span id="wm"></span><span id="wt" class="tabular-nums font-semibold w-12"></span><button id="wb" class="btn !px-2 !py-1" data-a="pstart"></button><span id="ws" class="text-xs text-zinc-500 hidden lg:inline"></span></div>`;
+}
+const rTool=()=>{const a=$('#anc');if(!a||!Rd)return;const on=Rd.tool!='off';a.style.pointerEvents=on?'auto':'none';a.style.touchAction=on?'none':'auto';a.style.cursor=Rd.tool=='erase'?'cell':'crosshair'};
+const rUI=()=>{const t=$('#rtb');if(t&&Rd){t.innerHTML=tbHtml();upPomo()}rTool()};
+function drawAnn(){
+  const an=$('#anc');if(!an||!Rd)return;const x=an.getContext('2d'),k=(window.devicePixelRatio||1)*Rd.scale;
+  x.clearRect(0,0,an.width,an.height);x.lineCap=x.lineJoin='round';x.globalAlpha=.4;
+  Rd.strokes.forEach(s=>{x.strokeStyle=s.c;x.lineWidth=s.w*k;x.beginPath();s.p.forEach(([a,b],i)=>i?x.lineTo(a*k,b*k):x.moveTo(a*k,b*k));if(s.p.length==1)x.lineTo(s.p[0][0]*k+.1,s.p[0][1]*k);x.stroke()});
+}
+async function rPage(){
+  const R=Rd;if(!R||!R.doc||!$('#pdfc'))return;const tk=R.tk=(R.tk||0)+1;
+  try{R.task&&R.task.cancel()}catch(e){}
+  const pg=await R.doc.getPage(R.n);if(tk!=R.tk)return;
+  if(R.fit)R.scale=Math.min(4,Math.max(.3,($('#pgw').clientWidth-32)/pg.getViewport({scale:1}).width));
+  const vp=pg.getViewport({scale:R.scale}),dpr=window.devicePixelRatio||1,cv=$('#pdfc'),an=$('#anc');
+  cv.width=an.width=Math.floor(vp.width*dpr);cv.height=an.height=Math.floor(vp.height*dpr);
+  cv.style.width=an.style.width=vp.width+'px';cv.style.height=an.style.height=vp.height+'px';
+  R.strokes=[];drawAnn();
+  const task=R.task=pg.render({canvasContext:cv.getContext('2d'),viewport:vp,transform:dpr!=1?[dpr,0,0,dpr,0,0]:null});
+  try{await task.promise}catch(e){return}
+  if(tk!=R.tk)return;
+  try{R.strokes=(await tx('ann','readonly',s=>s.get(R.id+':'+R.n)))||[]}catch(e){}
+  if(tk!=R.tk)return;drawAnn();rUI();
+}
+const rgo=n=>{if(!Rd||!Rd.doc)return;n=Math.max(1,Math.min(Rd.total,Math.round(+n)||1));Rd.n=n;(S.pp=S.pp||{})[Rd.id]=n;save();rPage();$('#pgw')?.scrollTo(0,0)};
+const pp=e=>{const r=$('#anc').getBoundingClientRect();return[(e.clientX-r.left)/Rd.scale,(e.clientY-r.top)/Rd.scale]};
+const eraseAt=p=>{const r=12/Rd.scale,n=Rd.strokes.length;Rd.strokes=Rd.strokes.filter(s=>!s.p.some(q=>Math.hypot(q[0]-p[0],q[1]-p[1])<r+s.w/2));if(Rd.strokes.length!=n)drawAnn()};
+const saveAnn=()=>tx('ann','readwrite',s=>s.put(Rd.strokes,Rd.id+':'+Rd.n)).catch(()=>toast('Sauvegarde des surlignements impossible'));
+
+Object.assign(A,{
+  pimp:()=>{const cs=fl();if(!cs.length)return toast('Aucun cours dans cette sélection : créez-en un d\'abord');
+    modal('Importer des synthèses PDF',fld('Cours associé',sel('p-c',cs.map(c=>[c.id,c.name]),cs[0].id))+fld('Fichiers PDF',`<input id="p-f" type="file" accept="application/pdf,.pdf" multiple class="inp">`),
+    async()=>{const fs=[...$('#p-f').files].filter(f=>f.type=='application/pdf'||/\.pdf$/i.test(f.name)),k=$('#p-c').value;if(!fs.length)return toast('Choisissez au moins un fichier PDF');
+      try{for(const f of fs){const r={id:uid(),cid:k,name:f.name,size:f.size,added:Date.now(),blob:f};await tx('files','readwrite',s=>s.put(r));PF.push(r)}close();render();toast(fs.length+' PDF importé(s) ✔')}catch(e){toast('Import impossible : stockage local indisponible')}},'Importer')},
+  openpf:async d=>{const f=PF.find(x=>x.id==d.id);if(!f)return;
+    try{const L=await ensurePdf();S.pp=S.pp||{};Rd={id:f.id,rec:f,doc:null,n:S.pp[f.id]||1,total:0,scale:1,fit:true,tool:'off',color:COLS[0],w:16,strokes:[]};V.pf=f.id;if(cid(f.cid))P.cid=f.cid;render(1);
+      const doc=await L.getDocument({data:await f.blob.arrayBuffer()}).promise;if(!Rd||Rd.id!=f.id)return;Rd.doc=doc;Rd.total=doc.numPages;Rd.n=Math.min(Rd.n,Rd.total);render()}
+    catch(e){pdfReady=null;Rd=null;V.pf=null;render();toast('Lecture impossible : PDF illisible ou PDF.js non chargé (connexion ?)')}},
+  delpf:async d=>{const f=PF.find(x=>x.id==d.id);if(f&&confirm(`Supprimer « ${f.name} » et ses surlignements ?`)){await delPf(f);render();toast('Synthèse supprimée')}},
+  closepf:()=>{Rd=null;V.pf=null;document.body.classList.remove('focus');if(document.fullscreenElement)document.exitFullscreen();render(1)},
+  rprev:()=>rgo(Rd.n-1),rnext:()=>rgo(Rd.n+1),
+  rzin:()=>{Rd.fit=false;Rd.scale=Math.min(4,Rd.scale*1.2);rPage()},
+  rzout:()=>{Rd.fit=false;Rd.scale=Math.max(.3,Rd.scale/1.2);rPage()},
+  rfit:()=>{Rd.fit=true;rPage()},
+  rtool:d=>{Rd.tool=Rd.tool==d.v?'off':d.v;rUI()},
+  rcol:d=>{Rd.color=d.v;Rd.tool='pen';rUI()},
+  rclr:()=>{if(!Rd.strokes.length)return toast('Aucun trait sur cette page');if(confirm('Effacer tous les traits de cette page ?')){Rd.strokes=[];drawAnn();saveAnn()}},
+  rfocus:()=>{const b=document.body;b.classList.toggle('focus');if(b.classList.contains('focus'))document.documentElement.requestFullscreen?.().catch(()=>{});else if(document.fullscreenElement)document.exitFullscreen();setTimeout(()=>{rUI();Rd?.fit&&rPage()},200)}
+});
+Object.assign(C,{rpg:(d,t)=>rgo(t.value),rw:(d,t)=>{Rd.w=+t.value}});
+document.addEventListener('pointerdown',e=>{if(e.target.id!='anc'||!Rd||Rd.tool=='off')return;e.preventDefault();e.target.setPointerCapture(e.pointerId);Rd.dr=1;const p=pp(e);
+  if(Rd.tool=='pen'){Rd.cur={c:Rd.color,w:Rd.w/Rd.scale,p:[p]};Rd.strokes.push(Rd.cur);drawAnn()}else eraseAt(p)});
+document.addEventListener('pointermove',e=>{if(!Rd||!Rd.dr)return;const p=pp(e);if(Rd.tool=='pen'){Rd.cur.p.push(p);drawAnn()}else eraseAt(p)});
+['pointerup','pointercancel'].forEach(t=>document.addEventListener(t,()=>{if(!Rd||!Rd.dr)return;Rd.dr=0;saveAnn()}));
+document.addEventListener('keydown',e=>{if(V.v!='pdf'||!Rd||!Rd.doc||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;if(e.key=='ArrowRight')rgo(Rd.n+1);if(e.key=='ArrowLeft')rgo(Rd.n-1)});
+window.addEventListener('resize',()=>{if(V.v=='pdf'&&Rd&&Rd.fit&&Rd.doc){clearTimeout(Rd.rt);Rd.rt=setTimeout(rPage,200)}});
+document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&document.body.classList.contains('focus')){document.body.classList.remove('focus');setTimeout(()=>{rUI();Rd?.fit&&rPage()},150)}});
+
 render(1);
 </script>
 </body>
